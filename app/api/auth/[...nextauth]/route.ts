@@ -14,7 +14,7 @@ declare module "next-auth/jwt" {
   }
 }
 
-import NextAuth from "next-auth";
+import NextAuth, { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { compare } from "bcrypt";
@@ -24,13 +24,16 @@ import { User } from "@/models";
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   throw new Error("Missing Google OAuth environment variables");
 }
-const handler = NextAuth({
-  pages: {
-    signIn: "/register",
-  },
+
+export const authOptions: AuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
   },
+  pages: {
+    signIn: "/register",
+  },
+
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -84,6 +87,7 @@ const handler = NextAuth({
       return session;
     },
   },
-});
+};
+const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
