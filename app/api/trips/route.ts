@@ -9,7 +9,7 @@ connectDB();
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-console.log("SESSION DEBUG:", session);
+    console.log("SESSION DEBUG:", session);
     if (!session?.user?.id) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -30,7 +30,7 @@ console.log("SESSION DEBUG:", session);
       userId,
       itinerary,
       aiPrompt,
-      aiResponse,   
+      aiResponse,
     });
 
     return NextResponse.json(
