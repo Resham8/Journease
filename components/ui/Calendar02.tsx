@@ -10,9 +10,11 @@ import { DateRange } from "react-day-picker";
 interface Calendar02Props {
   value?: DateRange | undefined;
   onChange?: (value: DateRange | undefined) => void;
+  onBlur?: () => void;
+  name?: string;
 }
 
-export function Calendar02({ value, onChange }: Calendar02Props) {
+export function Calendar02({ value, onChange, onBlur, name }: Calendar02Props) {
   const [open, setOpen] = React.useState(false);  
 
   return (
@@ -23,11 +25,13 @@ export function Calendar02({ value, onChange }: Calendar02Props) {
             variant="outline"
             id="date"
             className="w-full py-5 justify-between font-normal "
+            onBlur={onBlur}
           >
-            {value?.from ? (
+           {value?.from ? (
               value.to ? (
                 <>
-                  {value.from.toLocaleDateString()} - {value.to.toLocaleDateString()}
+                  {value.from.toLocaleDateString()} -{" "}
+                  {value.to.toLocaleDateString()}
                 </>
               ) : (
                 `${value.from.toLocaleDateString()} →`

@@ -2,17 +2,26 @@ import {
   Select,
   SelectContent,
   SelectGroup,
-  SelectItem,
-  SelectLabel,
+  SelectItem,  
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
 
-export default function SelectAccomodations() {
+interface SelectAccommodationsProps {
+  value?: string;
+  onChange?: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+}
+
+export default function SelectAccomodations(  {value, 
+  onChange, 
+  placeholder = "Select accommodation",  
+}: SelectAccommodationsProps) {
   return (
-    <Select>
+    <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="w-full">
-        <SelectValue placeholder="Select accommodation" />
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>          
