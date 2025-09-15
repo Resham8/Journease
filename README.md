@@ -17,5 +17,3 @@ Journease is an AI-powered itinerary generator that creates personalized day-to-
 - **Social Sharing** – allow sharing itineraries with friends or on social media.  
 - **Export to Email** – users can receive their generated itinerary directly in their inbox.
 - **Upgrade to Paid AI API** – switch to a premium AI service for more accurate and reliable itinerary generation.
-
-### Journease landing page - https://journease-landing-page.vercel.app/
