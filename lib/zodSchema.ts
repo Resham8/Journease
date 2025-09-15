@@ -1,10 +1,11 @@
 import { z } from "zod";
 import type { DateRange } from "react-day-picker";
 
-const dateRangeSchema: z.ZodType<DateRange> = z.object({
+const dateRangeSchema = z.object({
   from: z.union([z.date(), z.undefined()]),
   to: z.union([z.date(), z.undefined()]).optional(),
 });
+
 
 export const tripSchema = z.object({
   destination: z.string().min(2, "Destination is required"),
