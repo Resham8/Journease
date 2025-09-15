@@ -1,28 +1,67 @@
 "use client";
+import Alerts from "@/components/Alerts";
 import GoogleIcon from "@/components/icons/GoogleIcon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@radix-ui/react-label";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState, useEffect } from "react";
 
 export default function Form() {
+  const router = useRouter();
+
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertDescription, setAlertDescription] = useState("");
+
+  // Auto-hide alert after 3 seconds
+  useEffect(() => {
+    if (showAlert) {
+      const timer = setTimeout(() => {
+        setShowAlert(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showAlert]);
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    signIn("credentials", {
+    const response = await signIn("credentials", {
       email: formData.get("email"),
       password: formData.get("password"),
-      redirect:false
+      redirect: false,
     });
-
-    // console.log({ response });
+    
+    if (response?.error) {      
+      console.log("Login failed:", response.error);
+      setAlertTitle("Login Failed");
+      setAlertDescription("Please check your email and password and try again.");
+      setShowAlert(true);
+    } else if (response?.ok && !response.error) {
+      console.log("Login successful!");
+      setAlertTitle("Login Successful");
+      setAlertDescription("Redirecting to dashboard...");
+      setShowAlert(true);
+      // Delay redirect to show success message
+      setTimeout(() => {
+        router.push("/Dashboard");
+      }, 1500);
+    }
   };
 
   return (
-    <div className="w-screen min-h-screen flex justify-center items-center bg-gray-100">
-      <div className=" w-96 h-auto py-4 px-6 outline rounded-xl">
+    <div className="w-screen min-h-screen flex justify-center items-center bg-gray-100 relative">
+      {/* Fixed positioned alert */}
+      {showAlert && (
+        <div className="fixed top-4 right-4 z-50 max-w-md">
+          <Alerts title={alertTitle} description={alertDescription} />
+        </div>
+      )}
+      
+      <div className="w-96 h-auto py-4 px-6 outline rounded-xl bg-white">
         <div className="text-center font-bold text-2xl py-5">
           <h1>Login Now</h1>
         </div>
@@ -33,11 +72,17 @@ export default function Form() {
               name="email"
               type="email"
               placeholder="janedoe@example.com"
+              required
             />
           </div>
           <div className="space-y-3">
             <Label htmlFor="password">Password</Label>
-            <Input name="password" type="password" placeholder="*********" />
+            <Input 
+              name="password" 
+              type="password" 
+              placeholder="*********"
+              required
+            />
           </div>
           <div className="my-3">
             <Button type="submit" className="w-full">
@@ -53,9 +98,9 @@ export default function Form() {
             </p>
           </div>
         </form>
-        <div className="w-full border-b-1 border-gray-900"></div>
+        <div className="w-full border-b border-gray-300 my-4"></div>
         <div className="py-5">
-          <Button className="w-full">
+          <Button className="w-full" type="button">
             <GoogleIcon />
             Login with google
           </Button>
