@@ -19,11 +19,12 @@ import { TagInput } from "./ui/TagInput";
 import SelectAccomodations from "./SelectAccomodation";
 import { Checkbox } from "./ui/checkbox";
 import { Textarea } from "./ui/textarea";
-import {z} from "zod";
 import { TripFormValues, tripSchema } from "@/lib/zodSchema";
-import { useForm, SubmitHandler, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { DateRange } from "react-day-picker";
+import { useForm, SubmitHandler, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import axios from "axios";
+import { useRouter } from "next/navigation";
+import Alerts from "./Alerts";
 
 const steps = [
   {
@@ -56,20 +57,20 @@ const Accessibilities = [
 ];
 
 export default function TripForm() {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [travlersOpen, setTravlersOpen] = useState(false);
-  const [adultTravlers, setAdultTravlers] = useState(0);
-  const [childTravlers, setChildTravlers] = useState(0);
 
   const {
     register,
     control,
     handleSubmit,
-    setValue,
-    formState: { errors },
+    getValues,
+    watch,
+    formState: { errors, isSubmitting },
   } = useForm<TripFormValues>({
     resolver: zodResolver(tripSchema),
-    defaultValues: {      
+    defaultValues: {
       travelers: { adults: 0, children: 0 },
       dietaryRestrictions: [],
       accessibility: [],
@@ -77,12 +78,61 @@ export default function TripForm() {
     },
   });
 
-
   const next = () => {
-    if (currentStep < steps.length - 1) {
+    if (currentStep < steps.length) {
       setCurrentStep((step) => step + 1);
     }
   };
+
+  const onSubmit: SubmitHandler<TripFormValues> = async (data) => {
+    console.log("Form Data:", data);
+
+    const transformed = {
+      destination: data.destination,
+      startDate: data.dates.from,
+      endDate: data.dates.to,
+      duration:
+        data.dates.from && data.dates.to
+          ? Math.ceil(
+              (+data.dates.to - +data.dates.from) / (1000 * 60 * 60 * 24)
+            )
+          : 0,
+      travelers: data.travelers.adults + data.travelers.children,
+      travelType: data.travelerType,
+      budget: data.budget,
+
+      preferences: {
+        interests: data.interests,
+        accommodation: data.accommodation,
+        dietaryRestrictions: data.dietaryRestrictions,
+        accessibility: data.accessibility,
+        additionalNotes: data.notes,
+      },
+
+      totalCost: 0,
+      totalActivities: 0,
+    };
+
+    try {
+      const res = await axios.post("http://localhost:3000/api/trips",transformed);
+      console.log(res.data);
+      sessionStorage.setItem("itinerary", JSON.stringify(res.data.Itinerary));
+      router.push("/Itinerary");
+    } catch (error) {
+      console.log(error)
+    }
+
+    <Alerts title="Form submitted successfully!" description="" variant="default"/>
+  };
+
+  const onError = (errors: any) => {
+    console.log("Form validation errors:", errors);
+    alert("Form has validation errors. Check console for details.");
+  };
+
+  const watchedTravelers = watch("travelers");
+  const totalTravelers =
+    (watchedTravelers?.adults || 0) + (watchedTravelers?.children || 0);
 
   return (
     <div className="w-full h-full">
@@ -114,7 +164,12 @@ export default function TripForm() {
       </div>
       <form
         className="max-w-6xl mx-auto px-6"
-        onSubmit={(e) => e.preventDefault()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+          }
+        }}
+        onSubmit={handleSubmit(onSubmit, onError)}
       >
         <div className="bg-white rounded-xl shadow-sm border p-8">
           {currentStep === 1 && (
@@ -124,10 +179,16 @@ export default function TripForm() {
                   <MapPin className="w-4 h-4 text-blue-600" />
                   Destinations
                 </Label>
-                <Input placeholder="Spain, Tokyo, Greece..." className="h-11" {...register("destination")} />
-                {errors.destination && (<p className="text-red-500 text-sm">
+                <Input
+                  placeholder="Spain, Tokyo, Greece..."
+                  className="h-11"
+                  {...register("destination")}
+                />
+                {errors.destination && (
+                  <p className="text-red-500 text-sm">
                     {errors.destination.message}
-                  </p>)}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -137,17 +198,20 @@ export default function TripForm() {
                 </Label>
                 <div className="h-11">
                   <Controller
-                  name="dates"
-                  control={control}
-                  render={({ field }) => (
-                    <Calendar02
-                      value={field.value}
-                      onChange={(newValue: DateRange | undefined) => field.onChange(newValue)}
-                    />
+                    name="dates"
+                    control={control}
+                    render={({ field }) => (
+                      <Calendar02
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    )}
+                  />
+                  {errors.dates && (
+                    <p className="text-red-500">{errors.dates.message}</p>
                   )}
-                />
-                {errors.dates && <p className="text-red-500">{errors.dates.message}</p>}
-                  
                 </div>
               </div>
 
@@ -162,11 +226,9 @@ export default function TripForm() {
                       variant="outline"
                       className="w-full h-11 justify-between font-normal"
                     >
-                      {adultTravlers + childTravlers > 0
-                        ? `${adultTravlers + childTravlers} ${
-                            adultTravlers + childTravlers === 1
-                              ? "Traveler"
-                              : "Travelers"
+                      {totalTravelers > 0
+                        ? `${totalTravelers} ${
+                            totalTravelers === 1 ? "Traveler" : "Travelers"
                           }`
                         : "Add Travelers"}
                       <User />
@@ -176,16 +238,28 @@ export default function TripForm() {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <Label className="text-sm font-medium">Adults</Label>
-                        <Counter
-                          count={adultTravlers}
-                          setCount={setAdultTravlers}
+                        <Controller
+                          name="travelers.adults"
+                          control={control}
+                          render={({ field }) => (
+                            <Counter
+                              count={field.value}
+                              setCount={field.onChange}
+                            />
+                          )}
                         />
                       </div>
                       <div className="flex justify-between items-center">
                         <Label className="text-sm font-medium">Children</Label>
-                        <Counter
-                          count={childTravlers}
-                          setCount={setChildTravlers}
+                        <Controller
+                          name="travelers.children"
+                          control={control}
+                          render={({ field }) => (
+                            <Counter
+                              count={field.value}
+                              setCount={field.onChange}
+                            />
+                          )}
                         />
                       </div>
                     </div>
@@ -197,36 +271,37 @@ export default function TripForm() {
                 <Label className="text-base font-medium flex items-center gap-2">
                   Traveler Type
                 </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    className="h-12 justify-start gap-3 hover:bg-blue-50 hover:border-blue-300"
-                  >
-                    <span className="text-lg">👤</span>
-                    Solo
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-12 justify-start gap-3 hover:bg-pink-50 hover:border-pink-300"
-                  >
-                    <span className="text-lg">❤️</span>
-                    Couple
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-12 justify-start gap-3 hover:bg-green-50 hover:border-green-300"
-                  >
-                    <span className="text-lg">👨‍👩‍👧‍👦</span>
-                    Family
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-12 justify-start gap-3 hover:bg-yellow-50 hover:border-yellow-300"
-                  >
-                    <span className="text-lg">👯‍♂️</span>
-                    Friends
-                  </Button>
-                </div>
+                <Controller
+                  name="travelerType"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="grid grid-cols-2 gap-3">
+                      {["solo", "couple", "family", "friends"].map((type) => (
+                        <Button
+                          key={type}
+                          type="button"
+                          variant={field.value === type ? "default" : "outline"}
+                          className="h-12 justify-start gap-3 hover:bg-blue-50 hover:border-blue-300 capitalize"
+                          onClick={() => field.onChange(type)}
+                        >
+                          <span className="text-lg">
+                            {type === "solo"
+                              ? "👤"
+                              : type === "couple"
+                              ? "❤️"
+                              : type === "family"
+                              ? "👨‍👩‍👧‍👦"
+                              : "👯‍♂️"}
+                          </span>
+                          {type}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                />
+                {errors.travelerType && (
+                  <p className="text-red-500">{errors.travelerType.message}</p>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -238,6 +313,7 @@ export default function TripForm() {
                   type="number"
                   placeholder="Enter your budget"
                   className="h-11"
+                  {...register("budget", { valueAsNumber: true })}
                 />
               </div>
             </div>
@@ -248,7 +324,17 @@ export default function TripForm() {
                 <Label className="text-base font-medium flex items-center gap-2">
                   Interests
                 </Label>
-                <TagInput />
+                <Controller
+                  name="interests"
+                  control={control}
+                  defaultValue={[]}
+                  render={({ field }) => (
+                    <TagInput value={field.value} onChange={field.onChange} />
+                  )}
+                />
+                {errors.interests && (
+                  <p className="text-red-500">{errors.interests.message}</p>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -256,7 +342,16 @@ export default function TripForm() {
                   Accommodation
                 </Label>
                 <div className="">
-                  <SelectAccomodations />
+                  <Controller
+                    name="accommodation"
+                    control={control}
+                    render={({ field }) => (
+                      <SelectAccomodations
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
                 </div>
               </div>
 
@@ -265,12 +360,38 @@ export default function TripForm() {
                   Dietary Restrictions
                 </Label>
                 <div>
-                  {dietaryPreferences.map((diets, index) => (
-                    <div key={index} className="flex gap-2 space-y-2">
-                      <Checkbox id={diets}></Checkbox>{" "}
-                      <Label htmlFor={diets}>{diets}</Label>
-                    </div>
-                  ))}
+                  <Controller
+                    name="dietaryRestrictions"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="space-y-2">
+                        {dietaryPreferences.map((diet) => {
+                          const isChecked =
+                            field.value?.includes(diet) || false;
+                          return (
+                            <div key={diet} className="flex items-center gap-2">
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    field.onChange([
+                                      ...(field.value || []),
+                                      diet,
+                                    ]);
+                                  } else {
+                                    field.onChange(
+                                      field.value?.filter((d) => d !== diet)
+                                    );
+                                  }
+                                }}
+                              />
+                              <Label>{diet}</Label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  />
                 </div>
               </div>
 
@@ -279,12 +400,37 @@ export default function TripForm() {
                   Accessibility
                 </Label>
                 <div>
-                  {Accessibilities.map((accessibility, index) => (
-                    <div key={index} className="flex gap-2 space-y-2">
-                      <Checkbox id={accessibility}></Checkbox>
-                      <Label htmlFor={accessibility}>{accessibility}</Label>
-                    </div>
-                  ))}
+                  <Controller
+                    name="accessibility"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="space-y-2">
+                        {Accessibilities.map((acc) => {
+                          const isChecked = field.value?.includes(acc) || false;
+                          return (
+                            <div key={acc} className="flex items-center gap-2">
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    field.onChange([
+                                      ...(field.value || []),
+                                      acc,
+                                    ]);
+                                  } else {
+                                    field.onChange(
+                                      field.value?.filter((a) => a !== acc)
+                                    );
+                                  }
+                                }}
+                              />
+                              <Label>{acc}</Label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  />
                 </div>
               </div>
 
@@ -292,13 +438,66 @@ export default function TripForm() {
                 <Label className="text-base font-medium flex items-center gap-2">
                   Notes
                 </Label>
-                <Textarea placeholder="Type your Note here."></Textarea>
+                <Textarea
+                  placeholder="Type your Note here."
+                  {...register("notes")}
+                ></Textarea>
               </div>
             </div>
           )}
           {currentStep === 3 && (
-            <div>
-              
+            <div className="">
+              <div className="text-center">
+                <h2 className="text-2xl font-semibold">Review Your Trip</h2>
+              </div>
+              <div className="grid gap-4">
+                <div className="flex gap-2.5">
+                  <Label>Destination</Label>
+                  <p className="capitalize">{getValues("destination")}</p>
+                </div>
+                <div className="flex gap-2.5">
+                  <Label>Dates</Label>
+                  <p>
+                    {getValues("dates.from")?.toLocaleDateString()} -{" "}
+                    {getValues("dates.to")?.toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex gap-2.5">
+                  <Label>Travlers</Label>
+                  <p>
+                    {getValues("travelers").adults || 0} Adultes,{" "}
+                    {getValues("travelers").children || 0} Children
+                  </p>
+                </div>
+                <div className="flex gap-2.5">
+                  <Label>Budget</Label>
+                  <p>{getValues("budget")}</p>
+                </div>
+                <div className="">
+                  <h3 className="text-center font-medium text-xl">
+                    Prefrences
+                  </h3>
+                  <p className="flex gap-2.5">
+                    <Label>Interests: </Label>{" "}
+                    {getValues("interests")?.join(", ") || "None"}
+                  </p>
+                  <p className="flex gap-2.5">
+                    <Label>Accomodations: </Label>{" "}
+                    {getValues("accommodation") || "Not selected"}
+                  </p>
+                  <p className="flex gap-2.5">
+                    <Label>Dietary: </Label>{" "}
+                    {getValues("dietaryRestrictions")?.join(", ") || "None"}
+                  </p>
+                  <p className="flex gap-2.5">
+                    <Label>Accesebility: </Label>{" "}
+                    {getValues("accessibility")?.join(", ") || "None"}
+                  </p>
+                  <p className="flex gap-2.5">
+                    <Label>Notes: </Label> {getValues("notes") || "No notes"}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
           <div className="mt-8 flex justify-end gap-3">
@@ -307,9 +506,11 @@ export default function TripForm() {
                 Continue
               </Button>
             ) : (
-              <Button type="submit">Submit</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                Submit
+              </Button>
             )}
-          </div>
+          </div>         
         </div>
       </form>
     </div>
